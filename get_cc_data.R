@@ -24,8 +24,9 @@ timeout(480)
 
 #Function to clean up API response
 #Note: Excludes cancelled applications
-clean_cc_output<-function(list){
-  bind_rows(map(list, ~as.data.frame(discard(.x, is.data.frame))))%>%
+clean_cc_output<-function(df){
+  df%>%
+    select(where(~!is.data.frame(.x)))%>%
     filter(ApplicationStatus!="Cancelled")%>%
     remove_empty("cols")
 }
@@ -52,12 +53,12 @@ res <- VERB("GET",
 details<-res$Application
 #clean up using clean_cc_data function
 results<-clean_cc_output(details)
-cat(paste0("Pulled ",length(results)," non-cancelled construction certificates.\n"))
+cat(paste0("Pulled ",nrow(results)," non-cancelled construction certificates.\n"))
+#collect results in list (bind once at end)
+results_list[[i]]<-results
 #Update if the response has exhausted all pages to end loop
 if(length(res)==4){
   more_pages<-F}else{
-#collect results in list (bind once at end)
-results_list[[i]]<-results
 #update index
 i<-i+1
   }
