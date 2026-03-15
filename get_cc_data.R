@@ -8,6 +8,7 @@ pacman::p_load(
   sf,
   tmap,
   httr,
+  jsonlite,
   scales,
   janitor,
   shiny,
@@ -24,21 +25,15 @@ timeout(480)
 #Function to clean up API response
 #Note: Excludes cancelled applications
 clean_cc_output<-function(list){
-  list_of_data<-purrr::map(list, function(element){
-    vectors_list<-purrr::discard(element,is.data.frame)
-    bind_cols(as.data.frame(vectors_list))
-  })
-  out<-dplyr::bind_rows(list_of_data)
-  out%<>%
+  bind_rows(map(list, ~as.data.frame(discard(.x, is.data.frame))))%>%
     filter(ApplicationStatus!="Cancelled")%>%
     remove_empty("cols")
-  return(out)
 }
 #Loop to extract all CCs in NSW database, 1000 at a time.
 #initialise index
 i<-1
 more_pages<-T
-out_frame<-data.frame()
+results_list<-list()
 while(more_pages==T){
 cat(paste0("Pulling data from the DPHI API, page number: ",i,"\n"))
 #Set up query headers
@@ -51,21 +46,24 @@ headers <- c(
 res <- VERB("GET",
             url = "https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineCC",
             add_headers(headers))%>%
-  content(as='parsed')
-#get details  
+  content(as='text', encoding='UTF-8')%>%
+  fromJSON(flatten=TRUE)
+#get details
 details<-res$Application
 #clean up using clean_cc_data function
 results<-clean_cc_output(details)
 cat(paste0("Pulled ",length(results)," non-cancelled construction certificates.\n"))
 #Update if the response has exhausted all pages to end loop
 if(length(res)==4){
-  more_pages==F}else{
-#join to output dataframe
-out_frame%<>%bind_rows(results)
+  more_pages<-F}else{
+#collect results in list (bind once at end)
+results_list[[i]]<-results
 #update index
 i<-i+1
   }
 }
+#Bind all pages together
+out_frame<-bind_rows(results_list)
 
 #Clean up output dataframe
 clean_cc_data<-clean_names(out_frame)%>%
