@@ -49,22 +49,23 @@ res <- VERB("GET",
             add_headers(headers))%>%
   content(as='text', encoding='UTF-8')%>%
   fromJSON(flatten=TRUE)
-#get details
+#get details — if NULL, no more data
 details<-res$Application
+if(is.null(details)||length(details)==0){
+  cat("No more results returned, ending loop.\n")
+  more_pages<-F}else{
 #clean up using clean_cc_data function
 results<-clean_cc_output(details)
 cat(paste0("Pulled ",nrow(results)," non-cancelled construction certificates.\n"))
 #collect results in list (bind once at end)
 results_list[[i]]<-results
-#Update if the response has exhausted all pages to end loop
-if(length(res)==4){
-  more_pages<-F}else{
+#Build rolling output so partial results are available if interrupted
+out_frame<-bind_rows(results_list)
+cat(paste0("Total rows so far: ",nrow(out_frame),"\n"))
 #update index
 i<-i+1
   }
 }
-#Bind all pages together
-out_frame<-bind_rows(results_list)
 
 #Clean up output dataframe
 clean_cc_data<-clean_names(out_frame)%>%
