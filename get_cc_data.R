@@ -26,7 +26,12 @@ timeout(480)
 #Note: Excludes cancelled applications
 clean_cc_output<-function(df){
   df%>%
-    select(where(~!is.data.frame(.x)))%>%
+    mutate(
+      Location_X=map_chr(Location,~ifelse(is.null(.x)||nrow(.x)==0,NA_character_,.x$X[1])),
+      Location_Y=map_chr(Location,~ifelse(is.null(.x)||nrow(.x)==0,NA_character_,.x$Y[1])),
+      Location_FullAddress=map_chr(Location,~ifelse(is.null(.x)||nrow(.x)==0,NA_character_,.x$FullAddress[1]))
+    )%>%
+    select(-Location)%>%
     filter(ApplicationStatus!="Cancelled")%>%
     remove_empty("cols")
 }
@@ -70,10 +75,10 @@ i<-i+1
 #Clean up output dataframe
 clean_cc_data<-clean_names(out_frame)%>%
   select(1:14,#initial key information
-         intersect(starts_with("location"),c(ends_with("x"),ends_with('y'),ends_with('full_address'))),#Select only the first location listed
+         starts_with("Location") & (ends_with("X")|ends_with("Y")|ends_with("full_address")),#Select only the first location listed
          contains('building_code_class_building_code_class'),#drop BC descriptions, don't need these
          c('development_type','lodgement_date','date_submitted','determination_date'))%>%
   unite("building_code_types",contains('building_code'),sep=",",na.rm=T)#merge building codes into one list
 
 #save data
-write.csv(clean_cc_data,'./Outputs/construction_certs_over_100k.csv')
+write_csv(clean_cc_data,'./Outputs/construction_certs_over_100k.csv')
